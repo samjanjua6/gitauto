@@ -1,0 +1,43 @@
+name: Daily Streak Keeper
+
+on:
+  schedule:
+    # Runs everyday at 09:30 UTC and 17:30 UTC (twice a day to guarantee streak continuity across timezones)
+    - cron: '30 9 * * *'
+    - cron: '30 17 * * *'
+  workflow_dispatch: # Allows manual trigger anytime from GitHub Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  update-streak:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Update Activity Data
+        run: python update.py
+
+      - name: Commit & Push changes
+        run: |
+          git config --global user.name "Shaheer ul Hassan"
+          git config --global user.email "samjanjua6@gmail.com"
+          git add history.json LOG.md README.md
+          # Only commit if there are changes
+          if ! git diff --staged --quiet; then
+            DATE=$(date +'%Y-%m-%d')
+            git commit -m "chore(streak): daily activity sync [$DATE] [skip ci]"
+            git push
+          else
+            echo "No changes detected."
+          fi
