@@ -2,16 +2,15 @@ name: Daily Streak Keeper
 
 on:
   schedule:
-    # Runs everyday at 09:30 UTC and 17:30 UTC (twice a day to guarantee streak continuity across timezones)
-    - cron: '30 9 * * *'
-    - cron: '30 17 * * *'
+    # 11 windows across 24 hours to naturally distribute 4 to 10 randomized daily commits
+    - cron: '18 2,4,6,8,10,12,14,16,18,20,22 * * *'
   workflow_dispatch: # Allows manual trigger anytime from GitHub Actions tab
 
 permissions:
   contents: write
 
 jobs:
-  update-streak:
+  streak:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,19 +24,29 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Update Activity Data
-        run: python update.py
-
-      - name: Commit & Push changes
+      - name: Calculate Daily Plan & Update Data
         run: |
-          git config --global user.name "Shaheer ul Hassan"
-          git config --global user.email "samjanjua6@gmail.com"
-          git add history.json LOG.md README.md
-          # Only commit if there are changes
-          if ! git diff --staged --quiet; then
-            DATE=$(date +'%Y-%m-%d')
-            git commit -m "chore(streak): daily activity sync [$DATE] [skip ci]"
-            git push
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python update.py --force
           else
-            echo "No changes detected."
+            python update.py
           fi
+
+      - name: Commit and Push
+        run: |
+          if [ -s commit_msg.txt ]; then
+            COMMIT_MSG=$(cat commit_msg.txt)
+            git config --global user.name "Shaheer ul Hassan"
+            git config --global user.email "samjanjua6@gmail.com"
+            git add state.json history.json LOG.md README.md
+            git commit -m "$COMMIT_MSG"
+            git push
+            echo "Successfully committed and pushed: $COMMIT_MSG"
+          else
+            echo "Slot skipped to preserve organic 4-10 daily commit spacing."
+          fi
+
+      - name: Keepalive Workflow
+        uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          commit_message: "chore(ci): keepalive scheduled workflow [skip ci]"
